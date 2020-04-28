@@ -1,0 +1,515 @@
+---
+title: "STAT 208 - Homework 1"
+date: "Spring 2020 UCSC"
+author: "Kelsey Blackstone"
+output:
+    pdf_document: 
+    highlight: zenburn
+    latex_engine: xelatex
+header-includes:
+    - \usepackage{sectsty}
+    - \usepackage[dvipsnames]{xcolor}
+    - \allsectionsfont{\color{NavyBlue}}
+    - \usepackage{xcolor}
+---
+
+
+```{r, include=FALSE}
+rm(list=ls())
+```
+
+```{r, include=FALSE,echo=FALSE, message=FALSE, warning=FALSE}
+library(kableExtra)
+library(dplyr)
+library(data.table)
+library(xtable)
+library(MASS)
+require(data.table)
+```
+
+
+## Question #1: Simple Linear Regression 
+
+Fit a Simple Linear Regression Model to the Colorado snowfall data. 
+
+We are fitting the model,
+
+$$ \vec{Y} = X\vec{\beta} + \vec{\epsilon}$$
+
+
+Where the error variables are independent and identitically distributed,
+
+$$\vec{\epsilon} \overset{\text{iid}} \sim{}N(0, \sigma^2I_{n})$$
+ 
+```{r, echo=FALSE, results=FALSE}
+# avg_sno <- c(64,70,90,225,180,175)
+# elev <- c(5.280, 5.328, 7.522, 9.60, 6.732, 7.406)
+# lm1 <- lm(formula = avg_sno ~ elev)
+# plot(avg_sno ~ elev, xlab = "elevation", ylab = "average annual snowfall")
+# plot(lm1, which=1:2)
+```
+
+
+```{r}
+# Create design matrix 
+x1 <- c(1,1,1,1,1,1)
+elev <- c(5.280, 5.328, 7.522, 9.60, 6.732, 7.406)
+#elev <- c(5280, 5328, 7522, 960, 6732, 7406)
+x_design <- as.matrix(cbind(x1,elev))
+
+# y vector
+avg_sno <- matrix(data = c(64,70,90,225,180,175))
+
+# B hat estimate:
+estimates <- solve((t(x_design) %*% x_design)) %*% t(x_design) %*% 
+              avg_sno
+estimates <- as.data.frame(round(estimates[,1], 3))
+row.names(estimates) <- c("mu", "alpha")
+
+plot(elev, avg_sno, ylab = "average snowfall", 
+     xlab = "elevation (in thousands)", main = "SLR for Average Snowfall in CO cities")
+abline(a=estimates[1,], b=estimates[2,], col = "red")
+```
+
+```{r, echo=FALSE}
+
+kable(estimates, col.names = "Estimate", caption = "SLR Estimates") %>% 
+          kable_styling(bootstrap_options = c("striped", "hover"), 
+                        latex_options = "hold_position")
+```
+
+Using the Least Squares Estimates method, we see that the value of our intercept, $\hat{\mu}$, is $-104.683$ and the value of the slope, $\hat{\alpha}$ is $34.205$. This gives us the simple linear regression model of:
+
+$$\hat{Y_{i}} = -104.683 + 32.205 x_{i}$$
+
+where $Y_{i}$ is the average snowfall of town $i$, for $i = 1:6$, and $x_{i}$ is the elevation of town $i$. The residuals, $\epsilon_{i}$ are the are normally distributed with mean 0 and equal variance, $\sigma^2 > 0$, i.e.:
+
+$$\epsilon_{i}\overset{\text{iid}} \sim{}N(0, \sigma^2)$$
+
+## Question #2: Verify Identities
+
+See attached! :) 
+$\newline$
+$\newline$
+$\newline$
+$\newline$
+$\newline$
+$\newline$
+$\newline$
+$\newline$
+$\newline$
+
+
+## Question #3: Compute the Error Estimate
+
+We know that the error estimate (MSE) is computed as:
+$$ \hat{\sigma}^{2} = \frac{\sum_{i=1}^{N} (Y_{i}-\hat{Y_{i}})^2}{n-2}$$
+
+```{r}
+y_hat <-  estimates[1,] + estimates[2,]*elev
+y_i <- c(64,70,90,225,180,175)
+
+tot <- vector()
+
+for(j in 1:length(y_i)){
+      sum_y <- (y_i[j] - y_hat[j])^2
+      tot[j] <- sum_y
+}
+
+mse <- sum(tot) / (6-2)
+print(mse)
+```
+
+Thus, the error estimate, $\hat{\sigma}^{2} = 1944.22$
+
+## Question #4: Confidence Intervals
+Return to Question 1. Assuming that $\{{\epsilon_{t}}\}$ is IID and normally distributed, compute a 95% confidence interval for the trend slope parameter $\alpha$ and the intercept parameter $\mu$.
+```{r}
+## Initialize Values
+n = 6
+t.val <- qt(0.975, 4)
+
+# SE of mu / intercept
+mean.se.fit <- (1 / n) + (mean(elev)^2)/sum((elev - mean(elev))^2)
+
+# CI for mu (intercept)
+mu.conf.upper <- estimates[1,] + t.val * sqrt(mse * mean.se.fit)
+mu.conf.lower <- estimates[1,] - t.val * sqrt(mse * mean.se.fit)
+
+## CI for alpha (slope)
+alpha.conf.low <- estimates[2,] - t.val * sqrt(mse) / sqrt(sum((elev - mean(elev))^2))
+alpha.conf.upp <- estimates[2,] + t.val * sqrt(mse) / sqrt(sum((elev - mean(elev))^2))
+
+```
+
+```{r, echo=FALSE}
+r1 <- cbind("mu", round(mu.conf.lower, 3), round(mu.conf.upper, 3))
+r2 <- cbind("alpha", round(alpha.conf.low, 3), round(alpha.conf.upp, 3))
+
+tab <- as.data.table(rbind(r1,r2))
+setDT(tab)
+tab %>% kable(caption = "Confidence Intervals for SLR", 
+              col.names = c("Parameter","Lower Bound", "Upper Bound")) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                latex_options = "hold_position")
+
+```
+
+### Discussion: Does it bother you that the interval for $\mu$ contains negative numbers?
+
+Since $\mu$ represents the average snow level, the parameter should have a lower bound of 0, since there cannot be a negative amount of snow. One possible solution to envoke a lower bound is to apply a logarithmic transformation on $\mu$ to bound the parameter from $0$ to $\infty$. 
+
+## Question #5: Eigenvalues
+
+Find the eigenvalues and eigenvectors of the matrix,
+
+$$\Sigma = \begin{bmatrix}1 & \frac{1}{2} & \frac{1}{4}\\
+\frac{1}{2} & 1 & \frac{1}{2}\\
+\frac{1}{4} & \frac{1}{2} & 1\\
+\end{bmatrix}$$
+
+### Finding the Eigenvalues
+
+I have done this by hand (attached) but also wanted to compute them graphically in R (for fun!). To summarize the code, I made a function of the equation:
+$$
+|\bf{\Sigma} - \lambda\bf{I} | = 0
+$$
+to solve for the eigenvalues. I plotted the function over a range of possible lambda values to determine where the function crossed the x-axis (where the determinant equals 0). To determine the x-intercepts, I used two methods: the uniroot function and a method checking where the differences between positive determinant values are not equal to zero, i.e., the value of the determinant is 0. 
+
+```{r}
+d = c(1, 1/2, 1/4, 1/2, 1, 1/2, 1/4, 1/2, 1)
+matSig <- matrix(data = d, nrow = 3, ncol=3, byrow = TRUE)
+
+I <- diag(nrow=3,ncol=3)
+
+sys <- function(lam){
+  det(matSig - lam*I)
+}
+
+lam <- seq(0,2, len = 200)
+
+# Plot graph of determinants to find where the determinant = 0 
+plot(sapply(X = lam, FUN = sys), type = "l", ylab = "determinant", 
+     xlab = "Possible eigenvalues", main = "Determinants of Sigma matrix")
+abline(h=0, col ="red")
+text(150, -0.03, "determinant = 0", col="red", cex = 0.8)
+
+## Method 1: finding the roots of the quadratic equation
+
+# Identifying the x-intercepts 
+determs <- sapply(X = lam, FUN = sys)
+eigvals <- lam[((determs > 0)[-1] - (determs > 0)[-200]) != 0]
+
+## Method 2: finding the roots of the quadratic equation using uniroot()
+
+# quadratic equation for lambda, denoted by x
+func <- function(x){
+  -(x^3) + 3*x^2 - (39/16)*x + 9/16
+}
+
+# plot(sapply(X = lam, FUN = func), type="l")
+# abline(h=0)
+
+e1 <- uniroot(f = func, c(0,0.5))$root
+e2 <- uniroot(f = func, c(0.5,1.5), extendInt="yes")$root
+e3 <- uniroot(f = func, c(1.5,2), extendInt="yes")$root
+eigenvals <- c(e1,e2,e3)
+```
+
+```{r, echo=FALSE}
+cols <- c("method", "eigenvalue 1", "eigenvalue 2", "eigenvalue 3")
+col1 <- c("graphic", "uniroot()")
+tab <- rbind(round(eigvals,4), round(eigenvals,4))
+tab <- cbind(col1, tab)
+tab %>% kable(row.names = FALSE, col.names = cols) %>% 
+    kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+Now for the handwritten calculations, I had to use the rational root theorem to solve the third-order polynomial. I made a function for this in order to evaluate the polynomial at all values of the possibile roots. I then determined that the root was $0.75$. Using this eigenvalue, I determined the remaining two eigenvalues by factoring. 
+
+```{r}
+# rational root finding for question 5
+poss_roots <- c(1, 1/2, 1/4, 1/8, 1/16, 3, 3/2, 3/4, 
+                3/8, 3/16, 9, 9/2, 9/4, 9/8, 9/16)
+gross_func <- function(x){
+  -(16*x^3 - 48*x^2 + 39*x -9)
+}
+
+evals <- vector()
+for (i in 1:length(poss_roots)){
+  val <- gross_func(poss_roots[i])
+  evals[i] <- val
+}
+
+evals[] == 0
+root <- poss_roots[8]
+print(root)
+```
+
+```{r, echo=FALSE}
+handwrit_eigvals <- c((9-sqrt(33))/8, .75, (9+sqrt(33))/8)
+
+cols <- c("method", "eigenvalue 1", "eigenvalue 2", "eigenvalue 3")
+col1 <- c("graphic", "uniroot()","handwritten calculation")
+tab <- rbind(eigvals, eigenvals, handwrit_eigvals)
+tab <- cbind(col1, tab)
+tab %>% kable(row.names = FALSE, col.names = cols) %>% 
+    kable_styling(bootstrap_options = c("striped", "hover"))
+
+
+```
+
+As seen from the table, the two different approximation methods result in *slightly* different eigenvalues. This will be an issue trying to compute the eigenvectors from the approximations since the matrices will be invertible, and we will not be able to calculate the null space using the approximations.
+
+By hand, I found that the eigenvalues are:
+$$ \lambda_{1} = 0.75$$
+$$\lambda_{2} = \frac{9+\sqrt{33}}{8} $$
+$$\lambda_{3} = \frac{9-\sqrt{33}}{8} $$
+
+
+### Finding the Eigenvectors 
+We would like to solve three equations, each for $\lambda_{1}, \lambda_{2},$ and $\lambda_{3}$.
+
+For each eigenvector i, corresponding to $\lambda_{i},$ for $i = 1:3$, we are solving the equation for the vector, $\bf{\vec{x}}$:
+
+$$\left( \begin{bmatrix}1 & \frac{1}{2} & \frac{1}{4}\\
+\frac{1}{2} & 1 & \frac{1}{2}\\
+\frac{1}{4} & \frac{1}{2} & 1\\
+\end{bmatrix} - \begin{bmatrix}\lambda_{i} & 0 & 0\\
+0 & \lambda_{i} & 0\\
+0 & 0 & \lambda_{i}\\
+\end{bmatrix} \right) \cdot {\bf\vec{x}} = 0$$
+
+Let 
+
+$$ B = \begin{bmatrix}1 & \frac{1}{2} & \frac{1}{4}\\
+\frac{1}{2} & 1 & \frac{1}{2}\\
+\frac{1}{4} & \frac{1}{2} & 1\\
+\end{bmatrix} - \begin{bmatrix}\lambda_{i} & 0 & 0\\
+0 & \lambda_{i} & 0\\
+0 & 0 & \lambda_{i}\\
+\end{bmatrix}$$
+
+We will solve for the eigenvectors by computing the nullspace of $B$. 
+
+*Note: I attempted to do this by hand and immediately stopped after computing the eigenvector for the eigenvalue, $\frac{3}{4}$.*
+
+
+```{r}
+library(pracma) # for using nullspace function
+
+# for eigenvalue 1:
+B1 <- matSig - diag(0.75, nrow(matSig))
+ev1 <- nullspace(B1)
+
+# for eigenvalue 2:
+B2 <- matSig - diag((9-sqrt(33))/8, nrow(matSig))
+ev2 <- nullspace(B2)
+
+# for eigenvalue 3:
+B3 <- matSig - diag((9+sqrt(33))/8, nrow(matSig))
+ev3 <- -nullspace(B3)
+```
+
+```{r, echo=FALSE}
+matEV <- round(cbind(ev1, ev2, ev3), 4)
+tabl <- as.data.frame(matEV)
+cols <- c("0.75", "9 - sqrt(33) / 8","9 + sqrt(33) / 8")
+tabl %>% kable(col.names = cols, row.names = FALSE, escape = FALSE, 
+               caption = "Eigenvectors") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                latex_options = "hold_position")
+
+```
+
+### Identifying the components of the decompostion:
+$$P \Sigma P^{T} = D$$
+$\hspace{3cm}$ D is the diagonal matrix of eigenvalues, 
+$$ D = \begin{bmatrix}\frac{9+\sqrt{33}}{8} & 0 & 0\\
+0 & \frac{3}{4} & 0\\
+0 & 0 & \frac{9-\sqrt{33}}{8}\\
+\end{bmatrix}$$
+
+$\hspace{3cm}$ P is the matrix of eigenvectors,
+
+$$ P = \begin{bmatrix}-0.5418 & -1 & 0.4544\\
+-0.6426 & 0& -0.7662\\
+-0.5418 & 1 & 0.4544\\
+\end{bmatrix}$$
+$$ P^{T} = \begin{bmatrix}-0.5418 & -0.6426 & -0.5418\\
+-1 & 0& -1\\
+0.4544 & -0.7662 & 0.4544\\
+\end{bmatrix}$$
+
+$\hspace{3cm}$ And $\Sigma$ is our original covariance matrix,
+
+$$\Sigma = \begin{bmatrix}1 & \frac{1}{2} & \frac{1}{4}\\
+\frac{1}{2} & 1 & \frac{1}{2}\\
+\frac{1}{4} & \frac{1}{2} & 1\\
+\end{bmatrix}$$
+
+## Question #6:
+
+Give an example of a 2 × 2 covariance matrix of a random vector that has a zero eigenvalue.
+
+The general form of a 2 x 2 covariance matrix is:
+
+$$
+\begin{bmatrix} cov(Y_{1}. Y_{1}) & cov(Y_{1}. Y_{2})\\
+cov(Y_{2}. Y_{1}) & cov(Y_{2}. Y_{2})\\
+\end{bmatrix} = \begin{bmatrix} var(Y_{1}) & cov(Y_{1}. Y_{2})\\
+cov(Y_{2}. Y_{1}) & var(Y_{2})\\
+\end{bmatrix}
+$$
+For a matrix M to have a 0 eigenvalue, the random variables, $Y_{1}$ and $Y_{2}$ must be a linear combination of one other, i.e.,
+$$ Y_{j} = \sum_{i=1}^{k} a_{i}Y_{i}$$ and M is said to be positive semi-definite. For example, $Y_{1} = 1*Y_{2}$. Then the covariance of $Y_{1}$ and $Y_{2}$ is equal to 0. One example of this matrix would be:
+$$
+M = \begin{bmatrix} \frac{1}{4}& \frac{1}{4}\\
+\frac{1}{4}& \frac{1}{4}\\
+\end{bmatrix}\\
+$$
+
+```{r}
+daaat <- c(1/4, 1/4, 1/4, 1/4)
+x <- matrix(data = daaat, nrow = 2, ncol = 2)
+eigen(x)$values
+```
+
+As we can see, one of the eigenvalues is 0. 
+
+## Question #7
+
+$\vec{ Y} = (Y_{1}, Y_{2}, Y_{3})^T$ has density:
+$$(2\pi)^{-3/2} |V|^{-1}e^{-Q/2}$$
+Where $Q=2y_{1}^2 + y_{2}^2 + y_{3}^2 + 2y_{1}y_{2}-8y_{1}-4y_{2}+8$. 
+
+### (a) What type of distribution does $\vec{Y}$ have?
+$\vec{Y}$ has a $\textit{multivariate normal distribution}$ with three variables, $Y_{1}, Y_{2},$ and $Y_{3}$. 
+
+### (b) Identify $E[\vec{Y}]$ and $V^{-1}$
+
+We know that since $\vec{Y}$ has a MVN distribution, we need to solve for our unknowns, $E[\vec{Y}]$ and $V^{-1}$ by setting the expression,
+$$\frac{1}{2}(\vec{Y}-\vec{\mu})^{T}V^{-1}(\vec{Y}-\vec{\mu}) = \frac{Q}{2}$$
+$$(\vec{Y}-\vec{\mu})^{T}V^{-1}(\vec{Y}-\vec{\mu}) = Q$$
+The left-hand-side of the equation can be expanded to:
+$$\vec{Y}^{T}V^{-1}\vec{Y} - 2\mu^{T}V^{-1}\vec{Y} + \mu^{T}V^{-1}\mu$$
+Setting the left-hand side equal to the matrix representation on the right, we have:
+
+$$\tag{1} \vec{Y}^{T}V^{-1}\vec{Y} = 2Y_{1}^{2}+Y_{2}^{2}+Y_{3}^{2}+2Y_{1}Y_{2}$$
+$$\tag{2} -2\mu^{T}V^{-1}\vec{Y} = -8Y_{1}-4Y_{2}$$
+$$\tag{3}\mu^{T}V^{-1}\mu = 8\\$$
+
+For (1), the LHS of the equation is the definition of the inverse covariance matrix, so we have:
+
+$$V^{-1} = \begin{bmatrix}2 & 1 & 0\\
+1 & 1 & 0\\
+0 & 0 & 1\\
+\end{bmatrix}$$
+
+For (2), we have:
+
+$$2\mu^{T}V^{-1}\vec{Y} = 8Y_{1} + 4Y_{2}$$
+
+
+
+$$ \begin{bmatrix}
+\mu_{Y_{1}} & \mu_{Y_{2}} & \mu_{Y_{3}}\\
+\end{bmatrix} \times 
+\begin{bmatrix}4 & 2 & 0\\
+2 & 2 & 0\\
+0 & 0 & 2\\
+\end{bmatrix} 
+= 
+\begin{bmatrix}4\\2\\0 \end{bmatrix}$$
+
+Computing this matrix multipliation, we obtain the system of equations:
+
+$$4\mu_{Y_{1}} + 2\mu_{Y_{2}} = 4$$
+$$2\mu_{Y_{1}} + 2\mu_{Y_{2}} = 2$$
+$$2\mu_{Y_{3}} = 0$$
+Solving these equations, we obtain:
+$$\mu_{Y_{1}} = 2 - \mu_{Y_{2}}$$
+$$4-\mu_{Y_{2}} = 4$$
+$$\mu_{Y_{3}} = 0$$
+
+And finally, 
+
+$$\mu_{Y_{1}} = 2$$
+$$\mu_{Y_{2}} = 0$$ 
+$$\mu_{Y_{3}} = 0$$
+
+
+Moving forward with equation (3) to check our work, we have:
+
+$$ \begin{bmatrix}
+\mu_{Y_{1}} & \mu_{Y_{2}} & \mu_{Y_{3}}\\
+\end{bmatrix} 
+\begin{bmatrix}4 & 2 & 0\\
+2 & 2 & 0\\
+0 & 0 & 2\\
+\end{bmatrix} 
+\begin{bmatrix}
+\mu_{Y_{1}} \\ \mu_{Y_{2}} \\ \mu_{Y_{3}}\\
+\end{bmatrix}= 16$$
+
+$$4\mu_{Y_{1}}^{2} + 2\mu_{Y_{1}}\mu{Y_{2}} + 2\mu_{Y_{2}}^{2} = 16$$
+$$4\mu_{Y_{1}}^{2} + 2\mu_{Y_{2}}^{2} + 4\mu_{Y_{1}}\mu_{Y_{2}} = 16$$
+
+Plugging in $\mu_{Y_{1}}$ and $\mu_{Y_{2}}$,
+
+$$4(2^{2}) + 2(0)^{2} + 4(2)(0) = 16$$
+$$16 \overset{\checkmark}= 16$$
+
+So, we have that:
+
+$$E[\vec{Y}] = 
+\begin{bmatrix}
+2 \\
+0\\
+0
+\end{bmatrix}$$
+
+and 
+
+$$V^{-1} = 
+\begin{bmatrix} 
+2 & 1 & 0\\ 
+1 &1 & 0 \\ 
+0 & 0 & 1
+\end{bmatrix}$$
+
+## Question #8
+
+Suppose that $A$ is an $m \times n$ matrix and $B$ is an $n \times m$ matrix. Show that:
+
+$$ tr(AB) = tr(BA)$$
+
+By definition,
+$$tr(AB) = (AB)_{11} + (AB)_{22} + ... + (AB)_{mm}$$
+$$tr(BA) = (BA)_{11} + (BA)_{22} + ... + (BA)_{nn}$$
+
+
+Starting with the definition of $tr(AB)$,
+
+$$tr(AB) = \sum_{i=1}^{m}(AB)_{ii}$$
+$$= \sum_{i=1}^{m}\sum_{j}^{n}A_{ij}B_{ji}$$
+$$= \sum_{j=1}^{n}\sum_{i}^{m}B_{ij}A_{ji}$$
+$$= \sum_{j=1}^{n}(BA)_{jj}$$
+$$= tr(BA)$$
+$$\therefore\hspace{.2cm} tr(AB) = tr(BA)$$
+
+
+## Question #9
+
+Computed by hand. See attached.
+
+## Question #10
+
+Computed by hand. See attached.
+
+
+### Reproducable Work
+
+All of the code for this document can be found on my Github account, [Kelsey's Github!](https://github.com/kelseyblackstone/stat208_hw1). 
+
